@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>減量ペース・シミュレーター｜落とす速さで筋肉はどれだけ削れるか</title>
+<meta name="description" content="身長・体重・体脂肪率から、減量ペース別に「いつ目標に届くか」と「そのとき筋肉がどれだけ残るか」を同時に見るツール。速いほど早く着くが、脂肪ではなく筋肉が削れる。">
+<style>
+:root{
+  --bg:#0d1117; --panel:#151d2b; --line:#26334a; --fg:#e9eff8; --muted:#8ea3c2;
+  --fat:#e8734a; --lbm:#3fb6a8; --warn:#ffb300; --danger:#ff6b8b; --accent:#4da3ff;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;background:var(--bg);color:var(--fg);
+  font-family:system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+  display:flex;justify-content:center;
+  padding:max(14px,env(safe-area-inset-top)) 14px max(28px,env(safe-area-inset-bottom));
+  line-height:1.6;
+}
+.wrap{width:100%;max-width:640px}
+h1{font-size:1.2rem;margin:0 0 4px}
+.lede{color:var(--muted);font-size:.85rem;margin:0 0 18px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+h2{font-size:.95rem;margin:0 0 12px;color:var(--accent)}
+label{display:block;font-size:.78rem;color:var(--muted);margin-bottom:5px;font-weight:600}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid.three{grid-template-columns:1fr 1fr 1fr}
+input,select{
+  width:100%;padding:11px 10px;border-radius:9px;border:1px solid var(--line);
+  background:#0f1724;color:var(--fg);font:inherit;font-size:1rem;
+}
+input:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
+.field{margin-bottom:13px}
+.hint{font-size:.72rem;color:var(--muted);margin-top:4px;line-height:1.5}
+.seg{display:flex;gap:6px}
+.seg button{
+  flex:1;padding:10px 4px;border-radius:9px;border:1px solid var(--line);
+  background:#0f1724;color:var(--muted);font:inherit;font-size:.85rem;font-weight:600;cursor:pointer;
+}
+.seg button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#04182e}
+
+/* 結果 */
+.kpi{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px}
+.kpi div{background:#0f1724;border:1px solid var(--line);border-radius:10px;padding:10px 8px;text-align:center}
+.kpi b{display:block;font-size:1.3rem;font-variant-numeric:tabular-nums}
+.kpi span{font-size:.68rem;color:var(--muted)}
+canvas{width:100%;height:auto;display:block;border-radius:10px;background:#0f1724;border:1px solid var(--line)}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:.82rem}
+th,td{padding:9px 6px;text-align:right;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--muted);font-size:.72rem;font-weight:600}
+tr.pick td{background:rgba(77,163,255,.10)}
+td .tag{font-size:.68rem;padding:2px 6px;border-radius:99px;margin-left:5px;white-space:nowrap}
+.tag.ok{background:rgba(63,182,168,.18);color:var(--lbm)}
+.tag.warn{background:rgba(255,179,0,.16);color:var(--warn)}
+.tag.bad{background:rgba(255,107,139,.16);color:var(--danger)}
+.note{border-left:3px solid var(--warn);padding:9px 12px;background:rgba(255,179,0,.07);
+      border-radius:0 8px 8px 0;font-size:.8rem;margin-top:12px}
+.note.danger{border-color:var(--danger);background:rgba(255,107,139,.07)}
+.legend{display:flex;gap:14px;justify-content:center;font-size:.72rem;color:var(--muted);margin-top:9px}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+details{margin-top:14px;font-size:.8rem;color:var(--muted)}
+summary{cursor:pointer;color:var(--accent);font-weight:600}
+details p{margin:9px 0}
+footer{color:var(--muted);font-size:.72rem;text-align:center;margin-top:20px;line-height:1.9}
+.disclaimer{background:rgba(255,107,139,.07);border:1px solid rgba(255,107,139,.28);
+            border-radius:10px;padding:12px 14px;font-size:.78rem;margin-bottom:16px}
+.disclaimer b{color:var(--danger)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>減量ペース・シミュレーター</h1>
+  <p class="lede">速く落とすほど早く着く。ただし削れるのは脂肪だけじゃない。<br>その取引を、数字とグラフで同時に見るツール。</p>
+
+  <div class="disclaimer">
+    <b>先に断っておくこと。</b> これは一般的な推定式にもとづく<b>目安</b>で、医療・栄養の助言ではありません。
+    実際の減り方は個人差が大きく、この通りにはなりません。持病・服薬・妊娠中／授乳中・成長期の方、
+    BMIが18.5未満の方は、自己判断せず医師や管理栄養士に相談してください。
+  </div>
+
+  <section class="panel">
+    <h2>あなたの数字</h2>
+    <div class="field">
+      <label>性別（推定式の切り替えに使います）</label>
+      <div class="seg" id="sex">
+        <button data-v="male" aria-pressed="true">男性</button>
+        <button data-v="female" aria-pressed="false">女性</button>
+      </div>
+    </div>
+    <div class="grid three">
+      <div class="field"><label>年齢</label><input id="age" type="number" inputmode="numeric" value="37" min="15" max="90"></div>
+      <div class="field"><label>身長 (cm)</label><input id="ht" type="number" inputmode="decimal" value="170" min="130" max="220" step="0.5"></div>
+      <div class="field"><label>体重 (kg)</label><input id="wt" type="number" inputmode="decimal" value="75" min="30" max="250" step="0.1"></div>
+    </div>
+    <div class="grid">
+      <div class="field">
+        <label>体脂肪率 (%)</label>
+        <input id="bf" type="number" inputmode="decimal" value="25" min="3" max="60" step="0.5">
+        <p class="hint">体組成計の値でOK。分からなければそのままでも動きます（精度は落ちます）。</p>
+      </div>
+      <div class="field">
+        <label>目標体脂肪率 (%)</label>
+        <input id="goal" type="number" inputmode="decimal" value="15" min="3" max="50" step="0.5">
+        <p class="hint">男性15%前後で腹筋のラインが出はじめる目安。</p>
+      </div>
+    </div>
+    <div class="field">
+      <label>ふだんの活動量</label>
+      <select id="act">
+        <option value="1.2">ほぼ座り仕事・運動なし</option>
+        <option value="1.375" selected>週1〜3回 軽い運動</option>
+        <option value="1.55">週3〜5回 運動</option>
+        <option value="1.725">週6〜7回 しっかり運動</option>
+      </select>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>いまの体</h2>
+    <div class="kpi">
+      <div><b id="k-lbm">–</b><span>除脂肪体重 kg</span></div>
+      <div><b id="k-fat">–</b><span>体脂肪量 kg</span></div>
+      <div><b id="k-tdee">–</b><span>維持カロリー</span></div>
+    </div>
+    <p class="hint" id="k-note"></p>
+  </section>
+
+  <section class="panel">
+    <h2>ペース別に、いつ着くか</h2>
+    <canvas id="chart" width="1160" height="620" role="img" aria-label="減量ペース別の体重推移グラフ"></canvas>
+    <div class="legend">
+      <span><i style="background:var(--lbm)"></i>ゆっくり</span>
+      <span><i style="background:var(--warn)"></i>ふつう</span>
+      <span><i style="background:var(--fat)"></i>速い</span>
+      <span><i style="background:var(--danger)"></i>無茶</span>
+    </div>
+    <table id="tbl">
+      <thead><tr><th>ペース</th><th>1日の摂取</th><th>目標まで</th><th>失う筋肉</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div id="warn"></div>
+  </section>
+
+  <details>
+    <summary>計算に何を使っているか</summary>
+    <p><b>除脂肪体重(LBM)</b> = 体重 ×(1 − 体脂肪率)。<b>基礎代謝</b>は体脂肪率が入っていれば Katch-McArdle 式（370 + 21.6 × LBM）、それ以外は Mifflin-St Jeor 式。<b>維持カロリー</b> = 基礎代謝 × 活動係数。</p>
+    <p><b>脂肪1kg ≒ 7,200kcal</b> として、赤字ぶんを日数で割って推移を出しています。</p>
+    <p><b>失う筋肉の推定</b>：減量が速いほど、減った重さのうち除脂肪組織の割合が増えるという一般的な知見にもとづき、週あたり体重比 0.5%までは減量分の約5%、0.75%で約15%、1.0%で約25%、それ以上は約35%が除脂肪組織という前提を置いています。<b>これは幅のある推定で、正確な予測ではありません。</b>個人差・トレーニング内容・たんぱく質摂取量で大きく変わります。</p>
+    <p>体重の落ち方は実際には直線になりません（体重が減ると維持カロリーも下がるため）。このツールは維持カロリーを毎週再計算して反映していますが、それでも目安です。</p>
+  </details>
+
+  <footer>
+    入力した数字はブラウザの中だけで計算され、どこにも送信されません。<br>
+    <a href="https://github.com/takakun-art/diet-pace-simulator" style="color:var(--accent)">ソースコード</a>
+  </footer>
+</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const KCAL_PER_KG_FAT = 7200;
+let sex = "male";
+
+/* ペース定義: 週あたり体重の何%を落とすか / 減量分のうち除脂肪組織の割合 */
+const PACES = [
+  {key:"ゆっくり", rate:0.0025, lbmShare:0.05, color:"#3fb6a8", tag:"ok",   note:"筋肉を守りやすい"},
+  {key:"ふつう",   rate:0.005,  lbmShare:0.05, color:"#3fb6a8", tag:"ok",   note:"標準的な範囲"},
+  {key:"速い",     rate:0.0075, lbmShare:0.15, color:"#ffb300", tag:"warn", note:"筋肉が落ちはじめる"},
+  {key:"かなり速い",rate:0.01,  lbmShare:0.25, color:"#e8734a", tag:"warn", note:"筋肉の損失が目立つ"},
+  {key:"無茶",     rate:0.015,  lbmShare:0.35, color:"#ff6b8b", tag:"bad",  note:"推奨できない"}
+];
+
+function readInputs(){
+  const num = (id, d) => { const v = parseFloat($(id).value); return isFinite(v) ? v : d; };
+  return {
+    age: Math.min(90, Math.max(15, num("age",37))),
+    ht:  Math.min(220,Math.max(130,num("ht",170))),
+    wt:  Math.min(250,Math.max(30, num("wt",75))),
+    bf:  Math.min(60, Math.max(3,  num("bf",25))) / 100,
+    goal:Math.min(50, Math.max(3,  num("goal",15))) / 100,
+    act: parseFloat($("act").value)
+  };
+}
+
+const bmrKatch = lbm => 370 + 21.6 * lbm;
+const bmrMifflin = (wt,ht,age) =>
+  10*wt + 6.25*ht - 5*age + (sex === "male" ? 5 : -161);
+
+/* 目標体脂肪率に到達したときの体重（除脂肪体重が保たれる前提の基準値） */
+const goalWeight = (lbm, goal) => lbm / (1 - goal);
+
+/* 1つのペースで週ごとにシミュレート */
+function simulate(inp, pace){
+  let wt = inp.wt;
+  let lbm = inp.wt * (1 - inp.bf);
+  let fat = inp.wt - lbm;
+  const series = [{w:wt, bf:inp.bf}];
+  let weeks = 0, kcalFirst = null;
+  const MAX_WEEKS = 160;
+
+  while (weeks < MAX_WEEKS){
+    const curBf = fat / wt;
+    if (curBf <= inp.goal) break;
+
+    const bmr  = bmrKatch(lbm);
+    const tdee = bmr * inp.act;
+    const dropKg = wt * pace.rate;                          // 今週落とす重さ
+    const dailyDeficit = dropKg * KCAL_PER_KG_FAT / 7;
+    const intake = tdee - dailyDeficit;
+    if (kcalFirst === null) kcalFirst = intake;
+
+    const lostLbm = dropKg * pace.lbmShare;
+    const lostFat = dropKg - lostLbm;
+    lbm = Math.max(1, lbm - lostLbm);
+    fat = Math.max(0, fat - lostFat);
+    wt  = lbm + fat;
+    weeks++;
+    series.push({w:wt, bf:fat/wt});
+    if (fat <= 0.01) break;
+  }
+  return {
+    weeks, series, intake:kcalFirst,
+    lbmLost: inp.wt*(1-inp.bf) - lbm,
+    reached: weeks < MAX_WEEKS
+  };
+}
+
+/* ---- グラフ ---- */
+function draw(runs, inp){
+  const c = $("chart"), g = c.getContext("2d");
+  const W = c.width, H = c.height, P = {l:74, r:22, t:22, b:52};
+  g.clearRect(0,0,W,H);
+
+  const maxWeeks = Math.max(12, ...runs.map(r => r.res.weeks));
+  const allW = runs.flatMap(r => r.res.series.map(s => s.w));
+  const maxW = Math.max(...allW), minW = Math.min(...allW);
+  const padY = Math.max(1, (maxW-minW) * 0.12);
+  const y0 = minW - padY, y1 = maxW + padY;
+
+  const X = w => P.l + (w / maxWeeks) * (W - P.l - P.r);
+  const Y = v => P.t + (1 - (v - y0) / (y1 - y0)) * (H - P.t - P.b);
+
+  // グリッド
+  g.strokeStyle = "#26334a"; g.fillStyle = "#8ea3c2";
+  g.font = "500 20px system-ui,sans-serif"; g.lineWidth = 1;
+  for (let i=0;i<=4;i++){
+    const v = y0 + (y1-y0)*i/4, y = Y(v);
+    g.beginPath(); g.moveTo(P.l,y); g.lineTo(W-P.r,y); g.stroke();
+    g.textAlign="right"; g.textBaseline="middle";
+    g.fillText(v.toFixed(1)+"kg", P.l-10, y);
+  }
+  const stepW = maxWeeks<=16 ? 4 : maxWeeks<=40 ? 8 : 16;
+  g.textAlign="center"; g.textBaseline="top";
+  for (let w=0; w<=maxWeeks; w+=stepW){
+    g.fillText(w+"週", X(w), H-P.b+12);
+  }
+
+  // 目標ライン
+  const gw = goalWeight(inp.wt*(1-inp.bf), inp.goal);
+  if (gw > y0 && gw < y1){
+    g.save(); g.setLineDash([7,6]); g.strokeStyle="#4da3ff";
+    g.beginPath(); g.moveTo(P.l,Y(gw)); g.lineTo(W-P.r,Y(gw)); g.stroke(); g.restore();
+    g.fillStyle="#4da3ff"; g.textAlign="left"; g.textBaseline="bottom";
+    g.fillText("目標 "+gw.toFixed(1)+"kg", P.l+8, Y(gw)-6);
+  }
+
+  // 各ペース
+  runs.forEach(({pace,res}) => {
+    g.strokeStyle = pace.color; g.lineWidth = 4; g.beginPath();
+    res.series.forEach((s,i) => i ? g.lineTo(X(i),Y(s.w)) : g.moveTo(X(i),Y(s.w)));
+    g.stroke();
+    const last = res.series.length-1;
+    g.fillStyle = pace.color;
+    g.beginPath(); g.arc(X(last), Y(res.series[last].w), 7, 0, Math.PI*2); g.fill();
+  });
+}
+
+/* ---- 描画 ---- */
+function update(){
+  const inp = readInputs();
+  const lbm = inp.wt * (1 - inp.bf);
+  const fat = inp.wt - lbm;
+  const tdee = bmrKatch(lbm) * inp.act;
+
+  $("k-lbm").textContent = lbm.toFixed(1);
+  $("k-fat").textContent = fat.toFixed(1);
+  $("k-tdee").textContent = Math.round(tdee).toLocaleString();
+
+  const bmi = inp.wt / Math.pow(inp.ht/100, 2);
+  const gw = goalWeight(lbm, inp.goal);
+  $("k-note").textContent =
+    `BMI ${bmi.toFixed(1)}／体脂肪率 ${(inp.bf*100).toFixed(1)}% を ${(inp.goal*100).toFixed(1)}% にすると、`
+    + `除脂肪体重が変わらなければ体重は約 ${gw.toFixed(1)}kg（いまより ${(inp.wt-gw).toFixed(1)}kg 減）。`;
+
+  const warn = $("warn"); warn.replaceChildren();
+  const tb = $("tbl").querySelector("tbody"); tb.replaceChildren();
+
+  if (inp.goal >= inp.bf){
+    warn.innerHTML = '<div class="note">目標体脂肪率が現在と同じか、それより高くなっています。'
+      + '目標を現在より低い値にすると、ペース別の比較が出ます。</div>';
+    draw([{pace:PACES[1], res:{weeks:0, series:[{w:inp.wt,bf:inp.bf}]}}], inp);
+    return;
+  }
+
+  const runs = PACES.map(pace => ({pace, res: simulate(inp, pace)}));
+  draw(runs, inp);
+
+  const floor = sex === "male" ? 1500 : 1200;
+  let tooLow = false, bmrUnder = false;
+
+  runs.forEach(({pace,res}) => {
+    const tr = document.createElement("tr");
+    if (pace.rate === 0.005) tr.className = "pick";
+    const kcal = Math.round(res.intake || 0);
+    if (kcal < floor) tooLow = true;
+    if (kcal < bmrKatch(lbm)) bmrUnder = true;
+
+    const months = res.weeks/4.345;
+    const when = !res.reached ? "3年以上"
+      : res.weeks < 9 ? `${res.weeks}週`
+      : `${res.weeks}週（約${months.toFixed(1)}ヶ月）`;
+
+    tr.innerHTML =
+      `<td>${pace.key}<span class="tag ${pace.tag}">${pace.note}</span></td>` +
+      `<td>${kcal.toLocaleString()}<span style="color:var(--muted);font-size:.72rem">kcal</span></td>` +
+      `<td>${when}</td>` +
+      `<td style="color:${res.lbmLost>1.5?'var(--danger)':'inherit'}">−${res.lbmLost.toFixed(1)}kg</td>`;
+    tb.appendChild(tr);
+  });
+
+  const notes = [];
+  // 体格・目標そのものへの警告（ペースの話より先に出す）
+  const essential = sex === "male" ? 0.08 : 0.15;
+  if (bmi < 18.5){
+    notes.push(`<div class="note danger">いまのBMIが <b>${bmi.toFixed(1)}</b> で、`
+      + '一般に「低体重」とされる18.5を下回っています。<b>減量を前提にした計算そのものが不適切かもしれません。</b>'
+      + 'まず医師や管理栄養士に相談してください。</div>');
+  }
+  if (inp.goal < essential){
+    notes.push(`<div class="note danger">目標体脂肪率 <b>${(inp.goal*100).toFixed(1)}%</b> は、`
+      + `${sex==="male"?"男性":"女性"}にとって必須脂肪に近い水準です。`
+      + 'ホルモンや月経・免疫に影響が出る領域で、競技者が管理下で一時的に到達する範囲です。'
+      + '日常的に維持する目標としては勧められません。</div>');
+  }
+  notes.push('<div class="note"><b>読み方。</b>右の2列がこのツールの本体です。'
+    + '「目標まで」を縮めようとすると「失う筋肉」が増えます。'
+    + '同じ体重に着いても、筋肉を削って着いた体は見た目も基礎代謝も別物になります。</div>');
+  if (bmrUnder) notes.push('<div class="note">速いペースの摂取カロリーが<b>基礎代謝を下回って</b>います。'
+    + '長く続けられる設定ではありません。</div>');
+  if (tooLow) notes.push(`<div class="note danger">摂取カロリーが <b>${floor.toLocaleString()}kcal</b> を下回る行があります。`
+    + '自己判断でこの水準を続けるのは避けてください。ペースを落とすか、専門家に相談を。</div>');
+  warn.innerHTML = notes.join("");
+}
+
+/* ---- 入力 ---- */
+["age","ht","wt","bf","goal","act"].forEach(id => {
+  $(id).addEventListener("input", update);
+  $(id).addEventListener("change", update);
+});
+$("sex").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  sex = b.dataset.v;
+  [...$("sex").children].forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  $("goal").value = sex === "male" ? 15 : 24;
+  update();
+});
+update();
+</script>
+</body>
+</html>
