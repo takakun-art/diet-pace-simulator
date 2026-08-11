@@ -5,6 +5,34 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>減量ペース・シミュレーター｜落とす速さで筋肉はどれだけ削れるか</title>
 <meta name="description" content="身長・体重・体脂肪率から、減量ペース別に「いつ目標に届くか」と「そのとき筋肉がどれだけ残るか」を同時に見るツール。速いほど早く着くが、脂肪ではなく筋肉が削れる。">
+
+<!-- ── アクセス計測（GoatCounter）─────────────────────────────────
+     GC_CODE を自分のサイトコードに書き換えると計測が始まる。
+     "MYCODE" のままなら外部スクリプトを一切読み込まない（＝完全に無効）。
+     Cookieを置かず、IPも保存しない。
+     ★ 体重・体脂肪率などの入力値は絶対に送らない（送るのは「触られた」という事実だけ）。
+     ※ 2プロダクトで同一のスニペット。片方を直したらもう片方も揃えること。
+──────────────────────────────────────────────────────────── -->
+<script>
+"use strict";
+window.GC_CODE = "MYCODE";
+(function(){
+  if(!window.GC_CODE || window.GC_CODE === "MYCODE") return;
+  var s = document.createElement("script");
+  s.async = true;
+  s.src = "//gc.zgo.at/count.js";
+  s.setAttribute("data-goatcounter", "https://" + window.GC_CODE + ".goatcounter.com/count");
+  document.head.appendChild(s);
+})();
+/* 手動イベント。未設定・未ロード・広告ブロック時は黙って捨てる（本体の動作に影響させない） */
+window.gcEvent = function(name){
+  try{
+    if(window.goatcounter && window.goatcounter.count){
+      window.goatcounter.count({path:name, title:name, event:true});
+    }
+  }catch(e){}
+};
+</script>
 <style>
 :root{
   --bg:#0d1117; --panel:#151d2b; --line:#26334a; --fg:#e9eff8; --muted:#8ea3c2;
@@ -153,6 +181,7 @@ footer{color:var(--muted);font-size:.72rem;text-align:center;margin-top:20px;lin
 
   <footer>
     入力した数字はブラウザの中だけで計算され、どこにも送信されません。<br>
+    訪問者数だけ、Cookieを使わない計測（GoatCounter）で数えています。入力した数字は含みません。<br>
     <a href="https://github.com/takakun-art/diet-pace-simulator" style="color:var(--accent)">ソースコード</a>
   </footer>
 </div>
@@ -355,12 +384,20 @@ function update(){
 }
 
 /* ---- 入力 ---- */
+/* 「初期値のまま眺めただけ」と「自分の数字を入れた」を分ける。
+   1セッションにつき1回だけ送る（打鍵ごとに送らない）。値そのものは送らない。 */
+let usedOnce = false;
+function markUsed(){ if (usedOnce) return; usedOnce = true; gcEvent("sim-used"); }
+
 ["age","ht","wt","bf","goal","act"].forEach(id => {
   $(id).addEventListener("input", update);
   $(id).addEventListener("change", update);
+  $(id).addEventListener("input", markUsed);
+  $(id).addEventListener("change", markUsed);
 });
 $("sex").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
+  markUsed();
   sex = b.dataset.v;
   [...$("sex").children].forEach(x => x.setAttribute("aria-pressed", String(x === b)));
   $("goal").value = sex === "male" ? 15 : 24;
